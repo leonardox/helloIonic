@@ -1,5 +1,7 @@
 import { Component } from '@angular/core';
-import { IonicPage, NavController, NavParams } from 'ionic-angular';
+import { IonicPage, NavController, NavParams, LoadingController } from 'ionic-angular';
+import { MovieProvider } from '../../providers/movie/movie';
+import { MoviePage } from '../movie/movie';
 
 /**
  * Generated class for the FeedPage page.
@@ -12,8 +14,21 @@ import { IonicPage, NavController, NavParams } from 'ionic-angular';
 @Component({
   selector: 'page-feed',
   templateUrl: 'feed.html',
+  providers: [
+    MovieProvider
+  ]
 })
+
+
 export class FeedPage {
+  public loader;
+  public refresher;
+  public isRefreshing: boolean = false;
+  public lista_filmes = new Array<any>();
+  public movie;
+  public page = 1;
+  public infiniteScroll;
+
 
   public feed_object = {
     title: "Leonardo Cordeiro",
@@ -24,14 +39,95 @@ export class FeedPage {
     qtd_comments: 3,
     time_comment: "2h ago"
   }
-  
-  constructor(public navCtrl: NavController, public navParams: NavParams) {
+
+  constructor(
+    public navCtrl: NavController,
+    public navParams: NavParams,
+    private movieProvider: MovieProvider,
+    public loadingCtrl: LoadingController
+  ) {
   }
 
-  public username:string = "Leonardo Cordeiro";
+  presentLoading() {
+    this.loader = this.loadingCtrl.create({
+      content: "Carregando..."
+    });
+    this.loader.present();
+  }
 
-  ionViewDidLoad() {
+  closeLoading() {
+    this.loader.dismiss();
+  }
+
+  doRefresh(refresher) {
+    this.refresher = refresher;
+    this.isRefreshing = true;
+    this.loadMovieList();
+    // console.log('Begin async operation', refresher);
+
+    // setTimeout(() => {
+    //   console.log('Async operation has ended');
+    //   refresher.complete();
+    // }, 2000);
+  }
+
+  doInfinite(infiniteScroll) {
+    console.log('Begin async operation');
+    this.infiniteScroll = infiniteScroll;
+    this.page++;
+    this.loadMovieList(true);
+  }
+
+  ionViewDidEnter() {    
     console.log('ionViewDidLoad FeedPage');
+    this.loadMovieList();
   }
 
+  public loadMovieList(new_page:boolean = false) {
+    this.presentLoading();
+    console.log(this.page);
+    this.movieProvider.getPopularMovies(this.page).subscribe(
+      data=>{
+        const response = (data as any);
+        //const return_object = JSON.parse(response);
+
+        if (new_page) {
+          this.lista_filmes = this.lista_filmes.concat(response.results);
+          this.infiniteScroll.complete();
+        } else {
+          this.lista_filmes = response.results;
+          
+        }
+
+        console.log(data);
+        this.closeLoading();
+        if (this.isRefreshing) {
+          this.refresher.complete();
+        }
+      }, error => {
+        console.log(error);
+        this.closeLoading();
+        if (this.isRefreshing) {
+          this.refresher.complete();
+        }
+      }
+    );
+  }
+
+  public getMovieDetail(movie_id:string) {
+    this.presentLoading();
+    this.movieProvider.getMovieDetail(movie_id).subscribe(
+      data=>{
+        const response = (data as any);
+        //const return_object = JSON.parse(response);
+        this.movie = response; 
+        console.log(data);
+        this.closeLoading();
+        this.navCtrl.push(MoviePage, { movie: this.movie });
+      }, error => {
+        console.log(error);
+        this.closeLoading();
+      }
+    );
+  }
 }
